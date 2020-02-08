@@ -78,6 +78,8 @@ public:
 
   void setInnerFrameFixedSize(const QSize& size);
 
+  void setStatistics(float fps, float bandwidth);
+
 signals:
 
   void mouseLeft(int x, int y);
@@ -85,6 +87,8 @@ signals:
 protected slots:
 
   void onSmoothImageChanged(bool checked);
+
+  void onShowFPSChanged(bool checked);
 
 protected:
 
@@ -105,6 +109,10 @@ private:
   QImage qimage_;
 
   bool smoothImage_;
+
+  bool showFPS_;
+  double fps_;
+  double bandwidth_;
 };
 
 }

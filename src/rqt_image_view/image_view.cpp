@@ -36,22 +36,34 @@
 #include <ros/master.h>
 #include <sensor_msgs/image_encodings.h>
 
+#include <ros/topic_manager.h>
+
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/imgproc/imgproc.hpp>
 
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QPainter>
+#include <QTimer>
+#include <QDebug>
 
 Q_DECLARE_METATYPE(sensor_msgs::Image::ConstPtr)
 
 namespace rqt_image_view {
+
+// FPS estimator
+constexpr float HALF_LIFE = 0.5f;
+constexpr float LOG05 = -0.6931471805599453f; // std::log(0.5f)
+constexpr float DECAY = -LOG05/HALF_LIFE;
 
 ImageView::ImageView()
   : rqt_gui_cpp::Plugin()
   , widget_(0)
   , num_gridlines_(0)
   , rotate_state_(ROTATE_0)
+  , bytes_(0)
+  , lambdaLast_(0.0f)
+  , lambdaSmoothLast_(0.0f)
 {
   setObjectName("ImageView");
 }
@@ -113,6 +125,8 @@ void ImageView::initPlugin(qt_gui_cpp::PluginContext& context)
     ui_.rotate_label->fontMetrics().width("XXX°")
   );
 
+  connect(ui_.fps_check_box, SIGNAL(clicked(bool)), ui_.image_frame, SLOT(onShowFPSChanged(bool)));
+
   hide_toolbar_action_ = new QAction(tr("Hide toolbar"), this);
   hide_toolbar_action_->setCheckable(true);
   ui_.image_frame->addAction(hide_toolbar_action_);
@@ -124,12 +138,18 @@ void ImageView::initPlugin(qt_gui_cpp::PluginContext& context)
   connect(this, SIGNAL(receivedImage(sensor_msgs::Image::ConstPtr)),
           this, SLOT(callbackImage(sensor_msgs::Image::ConstPtr)),
           Qt::QueuedConnection);
+
+  stats_timer_ = new QTimer(this);
+  connect(stats_timer_, SIGNAL(timeout()), this, SLOT(updateStats()));
+  stats_timer_->start(500);
 }
 
 void ImageView::shutdownPlugin()
 {
   subscriber_.shutdown();
+  bandwidth_subscriber_.shutdown();
   pub_mouse_left_.shutdown();
+  stats_timer_->stop();
 }
 
 void ImageView::saveSettings(qt_gui_cpp::Settings& plugin_settings, qt_gui_cpp::Settings& instance_settings) const
@@ -146,6 +166,7 @@ void ImageView::saveSettings(qt_gui_cpp::Settings& plugin_settings, qt_gui_cpp::
   instance_settings.setValue("num_gridlines", ui_.num_gridlines_spin_box->value());
   instance_settings.setValue("smooth_image", ui_.smooth_image_check_box->isChecked());
   instance_settings.setValue("rotate", rotate_state_);
+  instance_settings.setValue("show_fps", ui_.fps_check_box->isChecked());
 }
 
 void ImageView::restoreSettings(const qt_gui_cpp::Settings& plugin_settings, const qt_gui_cpp::Settings& instance_settings)
@@ -190,6 +211,9 @@ void ImageView::restoreSettings(const qt_gui_cpp::Settings& plugin_settings, con
   if(rotate_state_ >= ROTATE_STATE_COUNT)
     rotate_state_ = ROTATE_0;
   syncRotateLabel();
+
+  bool show_fps = instance_settings.value("show_fps", true).toBool();
+  ui_.fps_check_box->setChecked(show_fps);
 }
 
 void ImageView::setColorSchemeList()
@@ -331,6 +355,8 @@ void ImageView::selectTopic(const QString& topic)
 void ImageView::onTopicChanged(int index)
 {
   subscriber_.shutdown();
+  bandwidth_subscriber_.shutdown();
+  resetFPSEstimator();
 
   // reset image on topic change
   ui_.image_frame->setImage(QImage());
@@ -349,9 +375,34 @@ void ImageView::onTopicChanged(int index)
     } catch (image_transport::TransportLoadException& e) {
       QMessageBox::warning(widget_, tr("Loading image transport plugin failed"), e.what());
     }
+
+    // Try to find the subscription
+    std::string realTopic = ui_.topics_combo_box->itemText(index).toStdString();
+    std::vector<std::string> topics;
+    ros::TopicManager::instance()->getSubscribedTopics(topics);
+    auto topicIt = std::find(topics.begin(), topics.end(), realTopic);
+    if(topicIt != topics.end())
+    {
+      bandwidth_subscriber_ = getNodeHandle().subscribe<topic_tools::ShapeShifter>(
+        realTopic, 5, &ImageView::callbackBandwidth, this
+      );
+    }
+    else
+    {
+      fprintf(stderr, "Not subscribing bandwidth checker for '%s'...\n", realTopic.c_str());
+    }
   }
 
   onMousePublish(ui_.publish_click_location_check_box->isChecked());
+}
+
+void ImageView::resetFPSEstimator()
+{
+  subscribe_time_ = ros::Time::now();
+  last_stats_time_ = ros::Time::now();
+  last_message_time_ = ros::Time(0);
+  lambdaLast_ = 0.0f;
+  lambdaSmoothLast_ = 0.0f;
 }
 
 void ImageView::onZoom1(bool checked)
@@ -566,6 +617,27 @@ void ImageView::overlayGrid()
 
 void ImageView::callbackImage(const sensor_msgs::Image::ConstPtr& msg)
 {
+  // Update FPS (see updateStats() for explanation)
+  {
+    ros::Time now = ros::Time::now();
+    ros::Time stamp = msg->header.stamp;
+
+    // Handle bad publishers or badly configured sim_time
+    // In that case, it is better to display an FPS estimated using our
+    // ros::Time.
+    if(stamp == ros::Time(0) || std::abs((now - stamp).toSec()) > 20.0)
+      stamp = ros::Time::now();
+
+    float tDelta = (stamp - last_message_time_).toSec();
+
+    float expL = std::exp(-DECAY * tDelta);
+
+    lambdaSmoothLast_ = DECAY * tDelta * expL * lambdaLast_ + expL * lambdaSmoothLast_;
+    lambdaLast_ = DECAY + expL * lambdaLast_;
+
+    last_message_time_ = stamp;
+  }
+
   // Make sure conversion_mat_ does not point to some old data (or, in the case
   // of cv_bridge::toCvShare() to an old message). This is important in the
   // manual conversion path below.
@@ -676,6 +748,42 @@ void ImageView::callbackImage(const sensor_msgs::Image::ConstPtr& msg)
   // though could check and see if the aspect ratio changed or not.
   onZoom1(ui_.zoom_1_push_button->isChecked());
 }
+
+void ImageView::callbackBandwidth(const topic_tools::ShapeShifter::ConstPtr& msg)
+{
+  bytes_ += msg->size();
+}
+
+void ImageView::updateStats()
+{
+  ros::Time now = ros::Time::now();
+
+  if(now < last_stats_time_)
+  {
+    // Jump back in time, reset everything (probably playing a bag file)
+    resetFPSEstimator();
+    return;
+  }
+
+  float bandwidth = static_cast<float>(bytes_) / (now - last_stats_time_).toSec();
+  bytes_ = 0;
+
+  // Estimate FPS at this time
+  // This is adapted from https://stackoverflow.com/a/23617678
+  float tDelta = (now - last_message_time_).toSec();
+  float expL = std::exp(-DECAY * tDelta);
+
+  // Bias correction
+  float t0Delta = (now - subscribe_time_).toSec();
+  float S = (1.0f + DECAY * t0Delta) * std::exp(-DECAY * t0Delta);
+
+  float fps = (DECAY * tDelta * expL * lambdaLast_ + expL * lambdaSmoothLast_) / (1.0f - S);
+
+  ui_.image_frame->setStatistics(fps, bandwidth);
+
+  last_stats_time_ = now;
+}
+
 }
 
 PLUGINLIB_EXPORT_CLASS(rqt_image_view::ImageView, rqt_gui_cpp::Plugin)

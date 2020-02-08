@@ -37,11 +37,31 @@
 
 namespace rqt_image_view {
 
+namespace
+{
+  QString memoryToString(float memory)
+  {
+    if(memory < static_cast<float>(1<<10))
+      return QString("%1 B").arg(memory, 0, 'f', 1);
+    else if(memory < static_cast<float>(1<<20))
+      return QString("%1 KiB").arg(memory / (1<<10), 0, 'f', 1);
+    else if(memory < static_cast<float>(1<<30))
+      return QString("%1 MiB").arg(memory / (1<<20), 0, 'f', 1);
+    else if(memory < static_cast<float>(1ull<<40))
+      return QString("%1 GiB").arg(memory / (1ull<<30), 0, 'f', 1);
+    else
+      return QString("%1 TiB").arg(memory / (1ull<<40), 0, 'f', 1);
+  }
+}
+
 RatioLayoutedFrame::RatioLayoutedFrame(QWidget* parent, Qt::WindowFlags flags)
   : QFrame()
   , outer_layout_(NULL)
   , aspect_ratio_(4, 3)
   , smoothImage_(false)
+  , showFPS_(true)
+  , fps_(0.0)
+  , bandwidth_(0.0)
 {
 }
 
@@ -174,6 +194,21 @@ void RatioLayoutedFrame::paintEvent(QPaintEvent* event)
     painter.setBrush(gradient);
     painter.drawRect(0, 0, frameRect().width() + 1, frameRect().height() + 1);
   }
+
+  if(showFPS_)
+  {
+    QString display = QString("FPS: %1 (%2/s)")
+      .arg(fps_, 0, 'f', 1)
+      .arg(memoryToString(bandwidth_));
+
+    int h = painter.fontMetrics().height();
+    int w = painter.fontMetrics().horizontalAdvance(display);
+
+    QRect rect(width() - w, height() - h, w, h);
+
+    painter.fillRect(rect, (fps_ < 1e-2) ? Qt::red : Qt::white);
+    painter.drawText(rect, display);
+  }
 }
 
 int RatioLayoutedFrame::greatestCommonDivisor(int a, int b)
@@ -196,6 +231,19 @@ void RatioLayoutedFrame::mousePressEvent(QMouseEvent * mouseEvent)
 
 void RatioLayoutedFrame::onSmoothImageChanged(bool checked) {
   smoothImage_ = checked;
+}
+
+void RatioLayoutedFrame::onShowFPSChanged(bool checked)
+{
+  showFPS_ = checked;
+  update();
+}
+
+void RatioLayoutedFrame::setStatistics(float fps, float bandwidth)
+{
+  fps_ = fps;
+  bandwidth_ = bandwidth;
+  update();
 }
 
 }

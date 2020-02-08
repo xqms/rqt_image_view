@@ -42,6 +42,7 @@
 #include <ros/macros.h>
 #include <sensor_msgs/Image.h>
 #include <geometry_msgs/Point.h>
+#include <topic_tools/shape_shifter.h>
 
 #include <opencv2/core/core.hpp>
 
@@ -80,6 +81,8 @@ protected slots:
   virtual void setColorSchemeList();
 
   virtual void updateTopicList();
+
+  virtual void updateStats();
 
 protected:
 
@@ -123,11 +126,14 @@ protected:
 
   virtual void overlayGrid();
 
+  virtual void callbackBandwidth(const topic_tools::ShapeShifter::ConstPtr& msg);
+
   Ui::ImageViewWidget ui_;
 
   QWidget* widget_;
 
   image_transport::Subscriber subscriber_;
+  ros::Subscriber bandwidth_subscriber_;
 
   cv::Mat conversion_mat_;
 
@@ -147,6 +153,8 @@ private:
 
   void syncRotateLabel();
 
+  void resetFPSEstimator();
+
   QString arg_topic_name;
   ros::Publisher pub_mouse_left_;
 
@@ -157,6 +165,15 @@ private:
   int num_gridlines_;
 
   RotateState rotate_state_;
+
+  uint64_t bytes_;
+  ros::Time subscribe_time_;
+  ros::Time last_stats_time_;
+  ros::Time last_message_time_;
+  float lambdaLast_;
+  float lambdaSmoothLast_;
+
+  QTimer* stats_timer_;
 };
 
 }
