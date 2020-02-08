@@ -9,20 +9,36 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>425</width>
-    <height>300</height>
+    <width>779</width>
+    <height>571</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Image View</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout" stretch="0,1">
-   <property name="margin">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
     <number>0</number>
    </property>
    <item>
     <widget class="QWidget" name="toolbar_widget" native="true">
      <layout class="QVBoxLayout" name="verticalLayout_2">
+      <item>
+       <widget class="QLabel" name="label">
+        <property name="text">
+         <string>TextLabel</string>
+        </property>
+       </widget>
+      </item>
       <item>
        <layout class="QHBoxLayout" name="horizontalLayout_3">
         <item>
@@ -45,11 +61,11 @@
         </item>
         <item>
          <widget class="QPushButton" name="zoom_1_push_button">
-          <property name="toolTip">
-           <string>Original zoom</string>
-          </property>
           <property name="enabled">
            <bool>false</bool>
+          </property>
+          <property name="toolTip">
+           <string>Original zoom</string>
           </property>
           <property name="icon">
            <iconset theme="zoom-original">
@@ -66,13 +82,13 @@
            <string># of gridlines to overlay</string>
           </property>
           <property name="minimum">
-           <double>0</double>
+           <number>0</number>
           </property>
           <property name="maximum">
-           <double>20</double>
+           <number>20</number>
           </property>
           <property name="value">
-           <double>0</double>
+           <number>0</number>
           </property>
          </widget>
         </item>
@@ -119,6 +135,19 @@
             <width>16</width>
             <height>16</height>
            </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="fps_check_box">
+          <property name="text">
+           <string>FPS</string>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
+          <property name="autoRepeat">
+           <bool>false</bool>
           </property>
          </widget>
         </item>
@@ -170,8 +199,7 @@
           </property>
           <property name="icon">
            <iconset theme="object-rotate-left">
-            <normaloff/>
-           </iconset>
+            <normaloff>.</normaloff>.</iconset>
           </property>
          </widget>
         </item>
@@ -192,8 +220,7 @@
           </property>
           <property name="icon">
            <iconset theme="object-rotate-right">
-            <normaloff/>
-           </iconset>
+            <normaloff>.</normaloff>.</iconset>
           </property>
          </widget>
         </item>
@@ -223,7 +250,7 @@
     </widget>
    </item>
    <item>
-    <layout class="QHBoxLayout" name="image_layout" stretch="1,0">
+    <layout class="QHBoxLayout" name="image_layout" stretch="1">
      <property name="spacing">
       <number>0</number>
      </property>
@@ -240,8 +267,8 @@
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>767</width>
-          <height>650</height>
+          <width>777</width>
+          <height>454</height>
          </rect>
         </property>
         <property name="sizePolicy">
@@ -251,34 +278,43 @@
          </sizepolicy>
         </property>
         <layout class="QHBoxLayout" name="horizontalLayout_4">
-          <item>
-           <widget class="rqt_image_view::RatioLayoutedFrame" name="image_frame">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <property name="minimumSize">
-             <size>
-              <width>80</width>
-              <height>60</height>
-             </size>
-            </property>
-            <property name="contextMenuPolicy">
-             <enum>Qt::ActionsContextMenu</enum>
-            </property>
-            <property name="frameShape">
-             <enum>QFrame::NoFrame</enum>
-            </property>
-            <property name="lineWidth">
-             <number>1</number>
-            </property>
-           </widget>
-          </item>
-          <property name="margin">
-           <number>1</number>
-          </property>
+         <property name="leftMargin">
+          <number>1</number>
+         </property>
+         <property name="topMargin">
+          <number>1</number>
+         </property>
+         <property name="rightMargin">
+          <number>1</number>
+         </property>
+         <property name="bottomMargin">
+          <number>1</number>
+         </property>
+         <item>
+          <widget class="rqt_image_view::RatioLayoutedFrame" name="image_frame">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="minimumSize">
+            <size>
+             <width>80</width>
+             <height>60</height>
+            </size>
+           </property>
+           <property name="contextMenuPolicy">
+            <enum>Qt::ActionsContextMenu</enum>
+           </property>
+           <property name="frameShape">
+            <enum>QFrame::NoFrame</enum>
+           </property>
+           <property name="lineWidth">
+            <number>1</number>
+           </property>
+          </widget>
+         </item>
         </layout>
        </widget>
       </widget>

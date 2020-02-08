@@ -78,6 +78,8 @@ public:
 
   void setInnerFrameFixedSize(const QSize& size);
 
+  void setStatistics(float fps, float bandwidth);
+
 signals:
 
   void delayed_update();
@@ -87,6 +89,8 @@ signals:
 protected slots:
 
   void onSmoothImageChanged(bool checked);
+
+  void onShowFPSChanged(bool checked);
 
 protected:
 
@@ -108,6 +112,10 @@ private:
   mutable QMutex qimage_mutex_;
 
   bool smoothImage_;
+
+  bool showFPS_;
+  double fps_;
+  double bandwidth_;
 };
 
 }
